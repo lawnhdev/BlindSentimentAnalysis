@@ -29,6 +29,7 @@ def parse_blind_post_from_url(driver, post_url):
     # Navigate to the post URL
     driver.get(post_url)
 
+
     # Extract page source
     page_source = driver.page_source
 
@@ -60,20 +61,23 @@ options = webdriver.ChromeOptions()
 options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 driver = webdriver.Chrome(options=options)
 
-driver.get('https://teamblind.com')
-time.sleep(10)
+blind_home_page_url = 'https://www.teamblind.com'
+# we are going to collect all the trending posts on the first five pages for a given company
+for i in range(1, 6):
+    company_trending_posts_url = f'https://www.teamblind.com/company/Meta/posts?page={i}'
+    driver.get(company_trending_posts_url)
+    time.sleep(10)
 
-entries = driver.get_log('performance')
-post_urls = []
-for entry in entries:
-    message = json.loads(entry['message'])
-    if 'message' in message and 'method' in message['message']:
-        method = message['message']['method']
-        if method == 'Network.responseReceived':
-            response = message['message']['params']['response']
-            url = response['url']
-            if 'www.teamblind.com/post/' in url:  # Filter based on the URL pattern of post requests
-                post_urls.append(url)
-print(post_urls)
-for post_url in post_urls:
-    parse_blind_post_from_url(driver=driver, post_url=post_url)
+    # Extract page source
+    page_source = driver.page_source
+    # Parse the HTML document using BeautifulSoup
+    soup = BeautifulSoup(page_source, 'html.parser')
+    # Find all <a> elements with href attribute starting with "/post/"
+    post_links = soup.find_all('a', href=lambda href: href and href.startswith('/post/'))
+    # Extract the href attribute from each <a> element
+    post_links_urls = [link['href'] for link in post_links]
+
+    unique_post_link_urls = list(set(post_links_urls))
+    for post_url in unique_post_link_urls:
+        parse_blind_post_from_url(driver=driver, post_url=blind_home_page_url + post_url)
+        time.sleep(10)
