@@ -56,45 +56,45 @@ def set_up_blind_post_database():
     # Return connection and cursor
     return conn, c
 
-def insert_blind_post_to_db(json_data, company, conn, c):
+def insert_blind_post_to_db(json_data, company, ddb):
     # Extract post information
-    post_info = (
-        json_data.get('headline', ''),
-        company,
-        json_data.get('text', ''),
-        json_data.get('datePublished', ''),
-        json_data.get('url', ''),
-        json_data.get('author', {}).get('name', ''),
-        json_data.get('commentCount', '')
+    post_info = {
+        'postId': str(uuid.uuid4()),  # Generate a unique postId (using UUID for example)
+        'Headline': {'S': json_data.get('headline', '')},
+        'Company': {'S': company},
+        'Text': {'S': json_data.get('text', '')},
+        'Date_Published': {'S': json_data.get('datePublished', '')},
+        'URL': {'S': json_data.get('url', '')},
+        'Author': {'S': json_data.get('author', {}).get('name', '')},
+        'Comment_Count': {'N': str(json_data.get('commentCount', ''))}
+    }
+
+    # Insert post information into DynamoDB table
+    dynamodb.put_item(
+        TableName='Posts',
+        Item=post_info
     )
 
-    # Insert post information into Post table
-    c.execute('''INSERT INTO Post (Headline, Company, Text, Date_Published, URL, Author, Comment_Count)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)''', post_info)
-
-    # Get the current post ID
-    post_id = c.lastrowid
-
     # Extract and insert comments
-    comments = json_data.get('comment', [])
+    comments = json_data.get('comments', [])
     for comment in comments:
         # Extract comment information
         author_info = comment.get('author', {})  # Get the author information
         author_name = author_info.get('name', '')  # Get the author's name
-        comment_info = (
-            post_id,  # Use the current post ID
-            author_name,
-            comment.get('text', ''),  # Get the comment text
-            comment.get('upvoteCount', ''), # Get the number of upvotes the comment has
-            json_data.get('datePublished', '')  # Use post's date published for comment
+        comment_info = {
+            'commentId': str(uuid.uuid4()),  # Generate a unique commentId
+            'postId': {'S': post_info['postId']['S']},  # Use the postId of the current post
+            'Author': {'S': author_name},
+            'Text': {'S': comment.get('text', '')},
+            'Upvotes': {'N': str(comment.get('upvoteCount', ''))},
+            'Date_Published': {'S': json_data.get('datePublished', '')}
+        }
+
+        # Insert comment information into DynamoDB table
+        dynamodb.put_item(
+            TableName='Comments',
+            Item=comment_info
         )
-
-        # Insert comment information into Comment table
-        c.execute('''INSERT INTO Comment (Post_ID, Author, Text, Upvotes, Date_Published)
-                      VALUES (?, ?, ?, ?, ?)''', comment_info)
-
-    # Commit changes to the database
-    conn.commit()
 
 def parse_blind_post_from_url(driver, post_url, company):
     # Navigate to the post URL
