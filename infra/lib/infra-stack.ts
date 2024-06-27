@@ -4,14 +4,20 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as sqs from 'aws-cdk-lib/aws-sqs'; // Import SQS module
+import * as iam from 'aws-cdk-lib/aws-iam';
+
+interface InfraStackProps extends cdk.StackProps  {
+  blindPostsQueue: sqs.IQueue;
+}
 
 export class InfraStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: InfraStackProps) {
     super(scope, id, props);
 
     const vpc = new ec2.Vpc(this, 'MyVpc', {
       maxAzs: 2, // create 2 availability zones in this VPC
-      natGateways: 1, // Number of NAT Gateways
+      natGateways: 0,
       subnetConfiguration: [
           {
             cidrMask: 24,
@@ -34,19 +40,6 @@ export class InfraStack extends cdk.Stack {
       destinationBucket: bucket
     });
 
-    const blindPostsTable = new dynamodb.Table(this, 'Posts', {
-      tableName: 'Posts', // Specify the table name here
-      partitionKey: { name: 'postId', type: dynamodb.AttributeType.STRING },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    const blindCommentsTable = new dynamodb.Table(this, 'Comments', {
-      tableName: 'Comments',
-      partitionKey: { name: 'commentId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'postId', type: dynamodb.AttributeType.STRING },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
     const securityGroup = new ec2.SecurityGroup(this, `infra-stack-security-group`, {
         vpc: vpc,
         allowAllOutbound: true,
@@ -63,16 +56,32 @@ export class InfraStack extends cdk.Stack {
                        "Visa", "CrowdStrike", "Qualcomm", "Adobe", "Cisco", "Accenture", "IBM", "Dell", "Infosys", "Spotify",
                        "Workday", "DoorDash", "Grubhub", "Cognizant", "Starbucks", "ServiceNow", "SoftBank"];
 
+
     // Calculate number of companies per instance
     const numInstances = Math.ceil(companies.length / companiesPerInstance);
-    for (let i = 0; i < numInstances; i++) {
+    // numInstances
+    for (let i = 0; i < 1; i++) {
+
+        // IAM role for EC2 instances
+        const instanceRole = new iam.Role(this, `scraper_ec2_instance_role_${i}`, {
+          assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+        });
+
+        // Attach policy to allow sending messages to SQS
+        const sqsPolicy = new iam.PolicyStatement({
+          actions: ['sqs:SendMessage'],
+          resources: [props.blindPostsQueue.queueArn],
+        });
+        instanceRole.addToPolicy(sqsPolicy);
+
         const instance = new ec2.Instance(this, `scraper_ec2_instance_${i}`, {
           instanceType: new ec2.InstanceType('t2.micro'),
           machineImage: ec2.MachineImage.latestAmazonLinux2023(),
           vpc: vpc,
           vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC }, // Launch in the public subnet
           securityGroup: securityGroup,
-          userData: ec2.UserData.forLinux()
+          role: instanceRole,
+          userData: ec2.UserData.forLinux(),
         });
 
         // Calculate the slice of companies for this instance
@@ -80,8 +89,10 @@ export class InfraStack extends cdk.Stack {
         const endIdx = Math.min((i + 1) * companiesPerInstance, companies.length);
         const instanceCompanies = companies.slice(startIdx, endIdx);
 
+
         instance.userData.addCommands(
             `echo '${JSON.stringify(instanceCompanies)}' > /home/ec2-user/companies.json`,
+            `echo '${props.blindPostsQueue.queueUrl}' > /home/ec2-user/queue_url.txt`,
             'sudo chmod +r /home/ec2-user/companies.json',
             'echo "Starting userdata script"',
             'echo "Downloading script from S3"',
@@ -90,17 +101,14 @@ export class InfraStack extends cdk.Stack {
             'aws s3 cp s3://' + bucket.bucketName + '/testscraper.py /home/ec2-user/testscraper.py',
             'sudo chmod +x /home/ec2-user/testscraper.py', // Ensure script is executable
             '/home/ec2-user/userdata-script.sh > /home/ec2-user/userdata-output.log 2>&1', // Execute script and log output
-            'echo "Userdata script execution completed"',
-            'python3 /home/ec2-user/testscraper.py'
+            'echo "Userdata script execution completed"'
         );
+
 
         // 'python3 /home/ec2-user/testscraper.py > /home/ec2-user/test-scraper-result.txt'
 
         // Allow EC2 instance to read from S3 bucket
         bucket.grantRead(instance);
-        // Grant permissions for EC2 instance to access DynamoDB table
-        blindPostsTable.grantReadWriteData(instance);
-        blindCommentsTable.grantReadWriteData(instance);
     }
   }
 }
