@@ -1,2 +1,3 @@
 data/
-blind_posts.db
+*.db
+*.csv
