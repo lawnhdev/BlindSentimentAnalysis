@@ -1,4 +1,4 @@
-from Cleaner import clean_post_data
+from Cleaner import clean_data
 import pprint
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
@@ -7,7 +7,7 @@ nltk.downloader.download('vader_lexicon')
 dataset_path = "../data/english_financial_news_v2.csv"
 
 if __name__ == "__main__":
-  cleaned_data = clean_post_data(dataset_path)
+  cleaned_data = clean_data(dataset_path)
   sentiment_scores = {}
   
   for idx, data in cleaned_data.iterrows():
