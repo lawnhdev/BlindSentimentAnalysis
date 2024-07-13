@@ -157,7 +157,8 @@ def scrape_company(company, proxy):
         current_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
         page_source = driver.page_source
         soup = BeautifulSoup(page_source, 'html.parser')
-        review_section = soup.find("h1", string=f'{company} Company Reviews').parent
+        # TODO why is soup.string sometimes "None"?
+        review_section = soup.find("h1", class_="text-xl").parent
         score_section = review_section.find("h2").parent
         score = score_section.find("h2").text
         review_count = score_section.find("p").text.split(" Reviews")[0]
@@ -185,10 +186,11 @@ def scrape_company(company, proxy):
         # Insert company reviews. Only add a new review if the count changed.
         res = c.execute('''SELECT Review_Count FROM CompanyReviews WHERE Company=?''', (company,))
         res = res.fetchone()
-        if res == None:
+        review_count = locale.atoi(review_count)
+        if res == None or (res != None and res[0] > review_count):
             company_reviews_info = (
                 company,
-                locale.atoi(review_count),
+                review_count,
                 current_timestamp,
                 float(score),
                 float(career_growth),
@@ -201,9 +203,6 @@ def scrape_company(company, proxy):
                 INSERT INTO CompanyReviews (Company, Review_Count, Created_Date, Score, Career_Growth, Work_Life_Balance, Comp_Benefits, Culture, Management)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (company_reviews_info))
             conn.commit()
-        else:
-            print(f"{res[0]} vs {locale.atoi(review_count)}")            
-
     except Exception as error:
         print(f"Caught error while fetching review data for company {company}: {error}")
     
