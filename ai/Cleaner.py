@@ -18,20 +18,15 @@ def reduce_lengthening(text):
 def text_preprocess(doc):
     #Lowercasing all the letters
     temp = doc.lower()
-    
     #removing the XML apostrophe
     temp = re.sub("&apos;", "", temp)
-
     temp = re.sub("&quot;", "",temp)
-
     #Removing hashtags, dollar signs and mentions
     temp = re.sub("@[A-Za-z0-9_]+","", temp)
     temp = re.sub("#[A-Za-z0-9_]+","", temp)
     temp = re.sub("[~+%=/-]", "", temp)
-
     # Removing stock tickers
     temp = re.sub("\$[A-Za-z]+", "", temp)
-
     #removing numbers
     temp = re.sub("[0-9]","", temp)
     #Removing '
@@ -42,6 +37,7 @@ def text_preprocess(doc):
     temp = temp[:669]  # Truncate if longer
     if len(temp) < 669:
         temp += [''] * (669 - len(temp))  # Pad if shorter
+        
     #Fixing Word Lengthening
     temp = [reduce_lengthening(w) for w in temp]
     #spell corrector

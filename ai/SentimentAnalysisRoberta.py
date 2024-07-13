@@ -35,9 +35,10 @@ def analyze_dataset(path):
         scores = analyze_text(data["clean_body"])
         ranking = np.argsort(scores)
         ranking = ranking[::-1]
-        #change this to post_id in final implementation
+        #change to post_id instead of body in final implementation 
         data_list.append({
-            "body": data["clean_body"],
+            "company": data["Company"],
+            "body": data["clean_body"], 
             "neutral": scores[ranking[0]],
             "positive": scores[ranking[1]],
             "negative": scores[ranking[2]]
@@ -45,12 +46,21 @@ def analyze_dataset(path):
 
     pprint.pp(data_list)
 
-    # instead of writing to a csv itll be written to the db
-    pd.DataFrame(data_list).to_csv("../data/sentiment_scores.csv", index=False)
+    
+    df = pd.DataFrame(data_list)
+    # just writing to csv for now to see the data
+    df.to_csv("../data/sentiment_scores.csv", index=False)
+    return df
+
+
 
 if __name__ == "__main__":
-    analyze_dataset(dataset_path)
-
+    df = analyze_dataset(dataset_path)
+    # group by company and get the average sentiment scores 
+    #TODO use a weighted average when we have likes, comments, and views
+    averages_df = df.groupby('company')[['neutral', 'positive', 'negative']].mean().reset_index()
+    # replace with writing to the db
+    pprint.pp(averages_df)
         
 
 
