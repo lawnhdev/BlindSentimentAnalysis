@@ -93,9 +93,10 @@ def clean_data(url, rows, comments=False):
     
     if comments:
         #TODO uncomment  when I have new dataset with Company data 
-        #result_df = df[['Post_ID', 'Date_Published', 'Company', 'Comment_ID', 'clean_body']] 
-
-        result_df = df_cleaned[['Post_ID', 'Date_Published', 'Comment_ID', 'clean_body']] 
+        print(df)
+        result_df = df[['Post_ID', 'Date_Published', 'Company', 'Comment_ID', 'clean_body']] 
+        
+        # result_df = df_cleaned[['Post_ID', 'Date_Published', 'Comment_ID', 'clean_body']] 
         # save the cleaned data to a csv file just for visualization 
         # this will be removed in the final implementation
         result_df.to_csv("../data/cleaned_comment_data.csv", index=False)

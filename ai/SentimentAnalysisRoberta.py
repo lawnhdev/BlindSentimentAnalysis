@@ -3,12 +3,18 @@ from transformers import TFAutoModelForSequenceClassification
 from transformers import AutoTokenizer, AutoConfig
 import numpy as np
 import pandas as pd
-import pprint
 from scipy.special import softmax
 from Cleaner import clean_data
 from transformers import logging
+import ImportCSVAll 
+import argparse
+import ImportCSV
+import sqlite3
+import datetime
 logging.set_verbosity_error()
+
 post_dataset_path = "../data/Post.csv"
+
 comments_dataset_path = "../data/Comment.csv"
 MODEL = f"cardiffnlp/twitter-roberta-base-sentiment-latest"
 
@@ -61,7 +67,8 @@ def analyze_post_comments(post_id, comment_data):
         ranking = np.argsort(scores)
         ranking = ranking[::-1]
         comment_scores.append({
-            #"company": data["Company"], uncomment when I have new dataset with Company data
+            # uncomment when I have new dataset with Company data
+            "company": data["Company"], 
             "post_id": data["Post_ID"],
             "comment_id": data["Comment_ID"],
             "neutral": scores[ranking[0]],
@@ -123,6 +130,14 @@ def analyze_dataset_with_comments(post_path, comments_path, weighted):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Generate sentiment for a company")
+    parser.add_argument("company", nargs='?', help="Company to generate for all history", type=str)
+    args = parser.parse_args()
+    if args.company == None:
+        ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
+    else:
+        ImportCSV.write_to_csv_single(args.company, post_dataset_path, comments_dataset_path)
+
     # dataset with just posts
     post_df = analyze_dataset(post_dataset_path)
     #dataset with posts + comments weighted equally
@@ -141,6 +156,19 @@ if __name__ == "__main__":
 
     #group by company and get the average sentiment scores with posts and comments unweighted
     company_avg_unweighted_df = unweighted_df.groupby('company')[['neutral', 'positive', 'negative']].mean().reset_index()
+    conn = sqlite3.connect('../blind_posts.db')
+
+    now = datetime.datetime.now()
+    comp_avg_no_comments_df['date_computed'] = str(now)
+    comp_avg_no_comments_df['type'] = 0
+    comp_avg_no_comments_df.to_sql('sentiment_scores', conn, if_exists='append')
+    comp_avg_weighted_df['date_computed'] = str(now)
+    comp_avg_weighted_df['type'] = 1
+    comp_avg_weighted_df.to_sql('sentiment_scores', conn, if_exists='append')
+
+    company_avg_unweighted_df['date_computed'] = str(now)
+    company_avg_unweighted_df['type'] = 2
+    company_avg_unweighted_df.to_sql('sentiment_scores', conn, if_exists='append')
 
     # replace with writing to the db
     print('no comments: ', comp_avg_no_comments_df)
