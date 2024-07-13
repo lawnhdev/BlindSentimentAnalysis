@@ -39,6 +39,8 @@ def set_up_blind_post_database():
                     Comment_ID INTEGER PRIMARY KEY,
                     Post_ID INTEGER,
                     Author TEXT,
+                    Company TEXT,
+                    Level TEXT,
                     Text TEXT,
                     Upvotes INTEGER,
                     Date_Published TEXT,
@@ -72,21 +74,36 @@ def insert_blind_post_to_db(json_data, company, conn, c):
     comments = json_data.get('comment', [])
     # print(comments)
     for comment in comments:
-        print(comment)
         # Extract comment information
         author_info = comment.get('author', {})  # Get the author information
         author_name = author_info.get('name', '')  # Get the author's name
         comment_info = (
             post_id,  # Use the current post ID
             author_name,
+            company, 
+            "parent",
             comment.get('text', ''),  # Get the comment text
             comment.get('upvoteCount', ''), # Get the number of upvotes the comment has
             json_data.get('datePublished', '')  # Use post's date published for comment
         )
-
+        child_comments = comment.get('comment')
+        for child_comment in child_comments:
+            child_author_info = child_comment.get('author', {})  # Get the author information
+            child_author_name = child_author_info.get('name', '')  # Get the author's name
+            child_comment_info = (
+                post_id,  # Use the current post ID
+                child_author_name,
+                company,
+                "child",
+                comment.get('text', ''),  # Get the comment text
+                comment.get('upvoteCount', ''), # Get the number of upvotes the comment has
+                json_data.get('datePublished', '')  # Use post's date published for comment
+            )
         # Insert comment information into Comment table
-        c.execute('''INSERT INTO Comment (Post_ID, Author, Text, Upvotes, Date_Published)
-                      VALUES (?, ?, ?, ?, ?)''', comment_info)
+        c.execute('''INSERT INTO Comment (Post_ID, Author, Company, Level, Text, Upvotes, Date_Published)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''', child_comment_info)
+        c.execute('''INSERT INTO Comment (Post_ID, Author, Company, Level, Text, Upvotes, Date_Published)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''', comment_info)
 
     # Commit changes to the database
     conn.commit()
@@ -179,8 +196,8 @@ def scrape_company(company, proxy):
 
         
 if __name__ =="__main__":
-    # proxies = ["168.81.214.71:3199", "67.227.127.63:3199", "168.81.71.179:3199","168.81.85.49:3199","181.177.71.14:3199"]
-    proxies = ["168.80.164.252:3199", "168.81.85.189:3199", "104.233.49.143:3199"]
+    proxies = ["168.81.214.71:3199", "67.227.127.63:3199", "168.81.71.179:3199","168.81.85.49:3199","181.177.71.14:3199"]
+    # proxies = ["104.239.114.10:3199", "185.199.118.133:3199", "168.80.149.234:3199", "181.177.64.3:3199", "168.80.183.45:3199"]
 
     blind_home_page_url = 'https://www.teamblind.com'
     companies = ["Meta","Google","Cisco","Oracle","Airbnb"]
