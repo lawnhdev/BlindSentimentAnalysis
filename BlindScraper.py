@@ -71,6 +71,7 @@ def set_up_blind_post_database():
 
 def insert_blind_post_to_db(json_data, company, conn, c):
     # Extract post information
+    # print(json_data)
     print("insert")
     post_info = (
         json_data.get('headline', ''),
@@ -131,7 +132,7 @@ def parse_blind_post_from_url(driver, post_url, company):
         try:
             # Parse the JSON data
             json_data = json.loads(script.string) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
-            # print(json_data)
+            print(json_data)
             if json_data.get('@type') == 'DiscussionForumPosting':
                 print("if2")
                 insert_blind_post_to_db(json_data, company, conn, c)

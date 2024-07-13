@@ -8,7 +8,10 @@ from bs4 import BeautifulSoup
 
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 
+from datetime import datetime
 
+import locale
+locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' )
 
 def inc_proxy():
     global proxy_num
@@ -21,6 +24,7 @@ def set_up_blind_post_database():
     # Connect to SQLite database
     conn = sqlite3.connect('blind_posts.db')
     c = conn.cursor()
+    
     # Create Post table
     c.execute('''CREATE TABLE IF NOT EXISTS Post (
                     Post_ID INTEGER PRIMARY KEY,
@@ -30,7 +34,8 @@ def set_up_blind_post_database():
                     Date_Published TEXT,
                     URL TEXT,
                     Author TEXT,
-                    Comment_Count INTEGER
+                    Comment_Count INTEGER,
+                    FOREIGN KEY (Company) REFERENCES Company(Name)
                 )''')
 
     # Create Comment table
@@ -43,6 +48,29 @@ def set_up_blind_post_database():
                     Date_Published TEXT,
                     FOREIGN KEY (Post_ID) REFERENCES Post(Post_ID)
                 )''')
+
+    # Create Company table
+    c.execute('''CREATE TABLE IF NOT EXISTS Company(
+                    Name TEXT PRIMARY KEY,
+                    Ticker TEXT,
+                    Btb_Score FLOAT, 
+                    Last_Updated TEXT
+              )''')    
+
+    # Create CompanyReviews table
+    c.execute('''CREATE TABLE IF NOT EXISTS CompanyReviews(
+                    Review_ID INTEGER PRIMARY KEY,
+                    Company TEXT,
+                    Review_Count INTEGER,
+                    Created_Date TEXT,
+                    Score FLOAT,
+                    Career_Growth FLOAT,
+                    Work_Life_Balance FLOAT,
+                    Comp_Benefits FLOAT,
+                    Culture FLAT,
+                    Management FLOAT,
+                    FOREIGN KEY (Company) REFERENCES Company(Name)
+              )''')
 
     # Return connection and cursor
     return conn, c
@@ -91,7 +119,6 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c):
     # Navigate to the post URL
     driver.get(post_url)
 
-
     # Extract page source
     page_source = driver.page_source
 
@@ -100,25 +127,21 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c):
 
     # Find all <script> elements
     script_elements = soup.find_all('script', {'type': 'application/ld+json'})
-    # Iterate over each script element to find the one containing the desired data
-
     
+    # Iterate over each script element to find the one containing the desired data
     for script in script_elements:
         # print(script)
         try:
             # Parse the JSON data
             json_data = json.loads(script.string) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
-            # print(json_data)
+            #print(json_data)
             if json_data.get('@type') == 'DiscussionForumPosting':
                 insert_blind_post_to_db(json_data, company, conn, c)
                 print('inserted ' + company + 'in thread ' + str(threading.get_native_id()))
         except json.JSONDecodeError as e:
             continue  # Every single one will fail except the post we are looking for
 
-
-
 # Close connection
-
 def scrape_company(company, proxy):
     conn, c = set_up_blind_post_database()
     options = webdriver.ChromeOptions()
@@ -126,6 +149,65 @@ def scrape_company(company, proxy):
     options.add_argument(f'--proxy-server={proxy}')
     driver = webdriver.Chrome(options=options)
 
+    # Company review parsing
+    company_reviews_url = f'https://www.teamblind.com/company/{company}/reviews'
+    driver.get(company_reviews_url)
+    time.sleep(10)
+    try:
+        current_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
+        review_section = soup.find("h1", string=f'{company} Company Reviews').parent
+        score_section = review_section.find("h2").parent
+        score = score_section.find("h2").text
+        review_count = score_section.find("p").text.split(" Reviews")[0]
+        review_categories = review_section.find("div", class_="grid").findAll("div", class_="flex")
+        # Order of categories: career growth, work life, comp/benefits, culture, management
+        get_category_score = lambda category: category.find("div", class_="font-semibold").text
+        career_growth = get_category_score(review_categories[0])
+        work_life = get_category_score(review_categories[1])
+        comp_benefits = get_category_score(review_categories[2])
+        culture = get_category_score(review_categories[3])
+        management = get_category_score(review_categories[4])
+        # Insert company to company table if it doesn't exist
+        res = c.execute('''SELECT Name FROM Company WHERE Name=?''', (company,))
+        if res.fetchone() == None:
+            company_info = (
+                company,
+                "",
+                0.0,
+                current_timestamp
+            )
+            c.execute(''' 
+                INSERT INTO Company (Name, Ticker, Btb_Score, Last_Updated)
+                 VALUES (?, ?, ?, ?)''', company_info)
+            conn.commit()
+        # Insert company reviews. Only add a new review if the count changed.
+        res = c.execute('''SELECT Review_Count FROM CompanyReviews WHERE Company=?''', (company,))
+        res = res.fetchone()
+        if res == None:
+            company_reviews_info = (
+                company,
+                locale.atoi(review_count),
+                current_timestamp,
+                float(score),
+                float(career_growth),
+                float(work_life),
+                float(comp_benefits),
+                float(culture),
+                float(management)
+            )
+            c.execute('''
+                INSERT INTO CompanyReviews (Company, Review_Count, Created_Date, Score, Career_Growth, Work_Life_Balance, Comp_Benefits, Culture, Management)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', (company_reviews_info))
+            conn.commit()
+        else:
+            print(f"{res[0]} vs {locale.atoi(review_count)}")            
+
+    except Exception as error:
+        print(f"Caught error while fetching review data for company {company}: {error}")
+    
+    # Company posts parsing
     company_trending_posts_url = f'https://www.teamblind.com/company/{company}/posts?page={i}'
     driver.get(company_trending_posts_url)
     time.sleep(10)
@@ -140,6 +222,7 @@ def scrape_company(company, proxy):
     for post_url in unique_post_link_urls:
         parse_blind_post_from_url(driver=driver, post_url=blind_home_page_url + post_url, company=company, conn=conn, c=c)
         time.sleep(10)
+    
     conn.close()
 
         
