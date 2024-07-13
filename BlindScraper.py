@@ -5,9 +5,6 @@ import sqlite3
 from selenium import webdriver
 from bs4 import BeautifulSoup
 
-from selenium.webdriver.common.proxy import Proxy, ProxyType
-
-
 '''
    Example data:
    
@@ -29,16 +26,6 @@ comment_data = {
 }
 
 '''
-print('poop')
-
-
-def inc_proxy():
-    global proxy_num
-    if(proxy_num == 4):
-        proxy_num = 0
-    else:
-        proxy_num+=1
-
 def set_up_blind_post_database():
     # Connect to SQLite database
     conn = sqlite3.connect('blind_posts.db')
@@ -71,8 +58,6 @@ def set_up_blind_post_database():
 
 def insert_blind_post_to_db(json_data, company, conn, c):
     # Extract post information
-    # print(json_data)
-    print("insert")
     post_info = (
         json_data.get('headline', ''),
         company,
@@ -123,30 +108,29 @@ def parse_blind_post_from_url(driver, post_url, company):
     soup = BeautifulSoup(page_source, 'html.parser')
 
     # Find all <script> elements
-    script_elements = soup.find_all('script', {'type': 'application/ld+json'})
+    script_elements = soup.find_all('script')
+
     # Iterate over each script element to find the one containing the desired data
-
-    
     for script in script_elements:
-        # print(script)
-        try:
-            # Parse the JSON data
-            json_data = json.loads(script.string) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
-            print(json_data)
-            if json_data.get('@type') == 'DiscussionForumPosting':
-                print("if2")
-                insert_blind_post_to_db(json_data, company, conn, c)
-            else:
-                print('poopyfart')
-        except json.JSONDecodeError as e:
-            continue  # Every single one will fail except the post we are looking for
+        if 'self.__next_f.push' in script.text:
+            # Split the script text by the prefix to isolate the JSON data
+            split_data = script.text.split('self.__next_f.push([1,')
 
-proxies = ["168.81.214.71:3199", "67.227.127.63:3199", "168.81.71.179:3199","168.81.85.49:3199","181.177.71.14:3199"]
-# proxies = ["168.81.214.71", "67.227.127.63", "168.81.71.179","168.81.85.49","181.177.71.14"]
+            # Check if the split operation was successful
+            if len(split_data) > 1:
+                try:
+                    stripped_data = split_data[1].rstrip('])')
+                    # Parse the JSON data
+                    json_data = json.loads(json.loads(stripped_data)) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
+                    if isinstance(json_data, dict) and json_data.get('@type') == 'DiscussionForumPosting':
+                        insert_blind_post_to_db(json_data, company, conn, c)
+                except json.JSONDecodeError as e:
+                    continue  # Every single one will fail except the post we are looking for
 
-# hosts = ["3199"]
-proxy_num = 0
-# driver = webdriver.Chrome(options=options)
+
+options = webdriver.ChromeOptions()
+options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+driver = webdriver.Chrome(options=options)
 
 blind_home_page_url = 'https://www.teamblind.com'
 conn, c = set_up_blind_post_database()
@@ -154,39 +138,23 @@ companies = ["Meta"]
 for company in companies:
     # we are going to collect all the trending posts on the first five pages for a given company
     for i in range(1, 6):
-
-        options = webdriver.ChromeOptions()
-        options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
-        options.add_argument(f'--proxy-server={proxies[proxy_num]}')
-        driver = webdriver.Chrome(options=options)
-
-
         company_trending_posts_url = f'https://www.teamblind.com/company/{company}/posts?page={i}'
         driver.get(company_trending_posts_url)
-        inc_proxy()
-        print(proxy_num)
-        # time.sleep(10)
+        time.sleep(10)
 
         # Extract page source
         page_source = driver.page_source
-        driver.quit()
         # Parse the HTML document using BeautifulSoup
         soup = BeautifulSoup(page_source, 'html.parser')
         # Find all <a> elements with href attribute starting with "/post/"
         post_links = soup.find_all('a', href=lambda href: href and href.startswith('/post/'))
         # Extract the href attribute from each <a> element
         post_links_urls = [link['href'] for link in post_links]
+
         unique_post_link_urls = list(set(post_links_urls))
         for post_url in unique_post_link_urls:
-            options = webdriver.ChromeOptions()
-            options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
-            options.add_argument(f'--proxy-server={proxies[proxy_num]}')
-            driver = webdriver.Chrome(options=options)
-            inc_proxy()
-            print(proxy_num)
             parse_blind_post_from_url(driver=driver, post_url=blind_home_page_url + post_url, company=company)
-            driver.quit()
-            # time.sleep(6)
+            time.sleep(10)
 
 # Close connection
 conn.close()
