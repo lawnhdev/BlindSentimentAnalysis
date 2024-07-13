@@ -33,6 +33,7 @@ def remove_emojis(text):
 
 def clean_data(url):
     df = pd.read_csv(url)
-    df['clean_body'] = df['body'].apply(remove_urls).apply(remove_emojis)
-    result_df = df[['tweet_id', 'post_date', 'clean_body']]
+    df['clean_body'] = df['newscontents'].apply(remove_urls).apply(remove_emojis)
+    
+    result_df = df[['newssource', 'clean_body']]
     return result_df

@@ -1,11 +1,10 @@
-
 from Cleaner import clean_data
 import pprint
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 nltk.downloader.download('vader_lexicon')
 
-dataset_path = "../data/stock_market_tweets.csv"
+dataset_path = "../data/english_financial_news_v2.csv"
 
 if __name__ == "__main__":
   cleaned_data = clean_data(dataset_path)
@@ -15,13 +14,10 @@ if __name__ == "__main__":
     sid = SentimentIntensityAnalyzer()
     scores = sid.polarity_scores(data["clean_body"])
 
-    if idx == 10000:
-      break   
-
-    if scores["neu"] > 0.5:
+    if scores["pos"] > 0.5 or scores["neg"] > 0.5:
+      sentiment_scores[data["newssource"]] = { "body": data["clean_body"], "scores": scores }
+    else:
       continue
-
-    sentiment_scores[data["tweet_id"]] = { "body": data["clean_body"]}
     
 
   pprint.pp(sentiment_scores)
