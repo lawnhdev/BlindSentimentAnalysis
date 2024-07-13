@@ -4,6 +4,7 @@ import sqlite3
 import threading
 
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 
 from selenium.webdriver.common.proxy import Proxy, ProxyType
@@ -38,6 +39,8 @@ def set_up_blind_post_database():
                     Comment_ID INTEGER PRIMARY KEY,
                     Post_ID INTEGER,
                     Author TEXT,
+                    Company TEXT,
+                    Level TEXT,
                     Text TEXT,
                     Upvotes INTEGER,
                     Date_Published TEXT,
@@ -66,8 +69,10 @@ def insert_blind_post_to_db(json_data, company, conn, c):
     # Get the current post ID
     post_id = c.lastrowid
 
+    # print(json_data)
     # Extract and insert comments
     comments = json_data.get('comment', [])
+    # print(comments)
     for comment in comments:
         # Extract comment information
         author_info = comment.get('author', {})  # Get the author information
@@ -75,26 +80,69 @@ def insert_blind_post_to_db(json_data, company, conn, c):
         comment_info = (
             post_id,  # Use the current post ID
             author_name,
+            company, 
+            "parent",
             comment.get('text', ''),  # Get the comment text
             comment.get('upvoteCount', ''), # Get the number of upvotes the comment has
             json_data.get('datePublished', '')  # Use post's date published for comment
         )
-
+        child_comments = comment.get('comment')
+        for child_comment in child_comments:
+            child_author_info = child_comment.get('author', {})  # Get the author information
+            child_author_name = child_author_info.get('name', '')  # Get the author's name
+            child_comment_info = (
+                post_id,  # Use the current post ID
+                child_author_name,
+                company,
+                "child",
+                comment.get('text', ''),  # Get the comment text
+                comment.get('upvoteCount', ''), # Get the number of upvotes the comment has
+                json_data.get('datePublished', '')  # Use post's date published for comment
+            )
         # Insert comment information into Comment table
-        c.execute('''INSERT INTO Comment (Post_ID, Author, Text, Upvotes, Date_Published)
-                      VALUES (?, ?, ?, ?, ?)''', comment_info)
+        c.execute('''INSERT INTO Comment (Post_ID, Author, Company, Level, Text, Upvotes, Date_Published)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''', child_comment_info)
+        c.execute('''INSERT INTO Comment (Post_ID, Author, Company, Level, Text, Upvotes, Date_Published)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''', comment_info)
 
     # Commit changes to the database
     conn.commit()
 
-def parse_blind_post_from_url(driver, post_url, company, conn, c):
+def parse_blind_post_from_url(driver, post_url, company, conn, c, options):
     # Navigate to the post URL
+    print(str(threading.get_native_id()) + str(driver))
+    print(str(threading.get_native_id()) + str(options))
     driver.get(post_url)
 
 
     # Extract page source
     page_source = driver.page_source
+    # print(page_source)
+    # buttons = driver.find_elements_by_class_name('overflow-hidden text-sm font-semibold text-black underline')
+    try:
+        buttons = driver.find_elements(By.CSS_SELECTOR, 'button.overflow-hidden.text-sm.font-semibold.text-black.underline')
+        print(buttons)
+    except:
+        print("an issue")
+    try:
+        for button in buttons:
+            button.click()
+    except:
+        print(str(threading.get_native_id()) + 'sign in popup')
+        
+        # driver.close()
+        # driver.get(post_url)
+        # page_source = driver.page_source
+        driver.quit()
+        driver = None
+        time.sleep(10)
+        driver = webdriver.Chrome(options=options)
+        print(str(threading.get_native_id()) + str(driver) + 'new driver')
+        driver.get(post_url)
+        # print("got post after sign in")
+        page_source = driver.page_source
 
+    
     # Parse the HTML document using BeautifulSoup
     soup = BeautifulSoup(page_source, 'html.parser')
 
@@ -111,10 +159,10 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c):
             # print(json_data)
             if json_data.get('@type') == 'DiscussionForumPosting':
                 insert_blind_post_to_db(json_data, company, conn, c)
-                print('inserted ' + company + 'in thread ' + str(threading.get_native_id()))
+                # print('inserted ' + company + 'in thread ' + str(threading.get_native_id()))
         except json.JSONDecodeError as e:
             continue  # Every single one will fail except the post we are looking for
-
+    return driver
 
 
 # Close connection
@@ -128,7 +176,7 @@ def scrape_company(company, proxy):
 
     company_trending_posts_url = f'https://www.teamblind.com/company/{company}/posts?page={i}'
     driver.get(company_trending_posts_url)
-    time.sleep(10)
+    # time.sleep(10)
     page_source = driver.page_source
     # Parse the HTML document using BeautifulSoup
     soup = BeautifulSoup(page_source, 'html.parser')
@@ -137,20 +185,25 @@ def scrape_company(company, proxy):
     # Extract the href attribute from each <a> element
     post_links_urls = [link['href'] for link in post_links]
     unique_post_link_urls = list(set(post_links_urls))
+    p = 0
     for post_url in unique_post_link_urls:
-        parse_blind_post_from_url(driver=driver, post_url=blind_home_page_url + post_url, company=company, conn=conn, c=c)
-        time.sleep(10)
+        print(str(threading.get_native_id()) + str(driver) + 'scrape_company')
+        driver = parse_blind_post_from_url(driver = driver, post_url=blind_home_page_url + post_url, company=company, conn=conn, c=c, options=options)
+        # time.sleep(10)
+        print(str(threading.get_native_id()) +'current count is ' + str(p))
+        p+=1
     conn.close()
 
         
 if __name__ =="__main__":
     proxies = ["168.81.214.71:3199", "67.227.127.63:3199", "168.81.71.179:3199","168.81.85.49:3199","181.177.71.14:3199"]
+    # proxies = ["104.239.114.10:3199", "185.199.118.133:3199", "168.80.149.234:3199", "181.177.64.3:3199", "168.80.183.45:3199"]
 
     blind_home_page_url = 'https://www.teamblind.com'
     companies = ["Meta","Google","Cisco","Oracle","Airbnb"]
     print('starting')
     threads = []
-    for i in range(0,5):
+    for i in range(0,3):
         print('starting thread' + str(i) + companies[i])
         t = threading.Thread(target=scrape_company, args=(companies[i],proxies[i]))
         t.start()
