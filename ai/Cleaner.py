@@ -81,9 +81,17 @@ def remove_emojis(text):
 
 def clean_post_data(url, rows):
     df = pd.read_csv(url, nrows=rows)
+    # remove the rows with referral in the text
+    df = df[~df['Text'].str.contains('referral', case=False, na=False)]
+
+    # apply the regex filter
     df['clean_body'] = df['Text'].apply(remove_urls).apply(remove_emojis).apply(text_preprocess)
+
     print("finished cleaning")
+
     #colummns to keep from the post table
     result_df = df[['Post_ID', 'Date_Published', 'Company', 'clean_body']] 
+    # save the cleaned data to a csv file just to visualize
+    #TODO remove in final version
     result_df.to_csv("../data/cleaned_data.csv", index=False)
     return result_df
