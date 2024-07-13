@@ -72,6 +72,7 @@ def insert_blind_post_to_db(json_data, company, conn, c):
     comments = json_data.get('comment', [])
     # print(comments)
     for comment in comments:
+        print(comment)
         # Extract comment information
         author_info = comment.get('author', {})  # Get the author information
         author_name = author_info.get('name', '')  # Get the author's name
@@ -117,7 +118,7 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c, options):
         # page_source = driver.page_source
         driver.quit()
         driver = None
-        # time.sleep(20)
+        time.sleep(10)
         driver = webdriver.Chrome(options=options)
         print(str(threading.get_native_id()) + str(driver) + 'new driver')
         driver.get(post_url)
