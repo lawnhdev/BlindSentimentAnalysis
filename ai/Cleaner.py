@@ -22,10 +22,12 @@ def text_preprocess(doc):
     #removing the XML apostrophe
     temp = re.sub("&apos;", "", temp)
 
+    temp = re.sub("&quot;", "",temp)
+
     #Removing hashtags, dollar signs and mentions
     temp = re.sub("@[A-Za-z0-9_]+","", temp)
     temp = re.sub("#[A-Za-z0-9_]+","", temp)
-    # temp = re.sub("[$%-]", "", temp)
+    temp = re.sub("[~+%=/-]", "", temp)
 
     # Removing stock tickers
     temp = re.sub("\$[A-Za-z]+", "", temp)
@@ -37,6 +39,9 @@ def text_preprocess(doc):
 
     #Tokenization
     temp = word_tokenize(temp)
+    temp = temp[:669]  # Truncate if longer
+    if len(temp) < 669:
+        temp += [''] * (669 - len(temp))  # Pad if shorter
     #Fixing Word Lengthening
     temp = [reduce_lengthening(w) for w in temp]
     #spell corrector
@@ -78,10 +83,11 @@ def remove_emojis(text):
                                "]+", flags=re.UNICODE)
     return emoji_pattern.sub('', text)
 
-def clean_data(url, rows):
+def clean_post_data(url, rows):
     df = pd.read_csv(url, nrows=rows)
-    df['clean_body'] = df['body'].apply(remove_urls).apply(remove_emojis).apply(text_preprocess)
+    df['clean_body'] = df['Text'].apply(remove_urls).apply(remove_emojis).apply(text_preprocess)
     print("finished cleaning")
-    result_df = df[['tweet_id', 'post_date', 'clean_body']]
-    # result_df.to_csv("../data/cleaned_data.csv", index=False)
+    #colummns to keep from the post table
+    result_df = df[['Post_ID', 'Date_Published', 'Company', 'clean_body']] 
+    result_df.to_csv("../data/cleaned_data.csv", index=False)
     return result_df
