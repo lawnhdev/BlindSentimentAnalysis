@@ -1,6 +1,53 @@
 import pandas as pd
 import re 
+import nltk
 
+nltk.download('punkt')
+nltk.download('wordnet')
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+from autocorrect import Speller
+spell = Speller(lang='en')
+lemm = WordNetLemmatizer()
+
+#Fixing Word Lengthening
+def reduce_lengthening(text):
+    pattern = re.compile(r"(.)\1{2,}")
+    return pattern.sub(r"\1\1", text)
+
+def text_preprocess(doc):
+    #Lowercasing all the letters
+    temp = doc.lower()
+    
+    #removing the XML apostrophe
+    temp = re.sub("&apos;", "", temp)
+
+    #Removing hashtags, dollar signs and mentions
+    temp = re.sub("@[A-Za-z0-9_]+","", temp)
+    temp = re.sub("#[A-Za-z0-9_]+","", temp)
+    # temp = re.sub("[$%-]", "", temp)
+
+    # Removing stock tickers
+    temp = re.sub("\$[A-Za-z]+", "", temp)
+
+    #removing numbers
+    temp = re.sub("[0-9]","", temp)
+    #Removing '
+    temp = re.sub("'"," ",temp)
+
+    #Tokenization
+    temp = word_tokenize(temp)
+    #Fixing Word Lengthening
+    temp = [reduce_lengthening(w) for w in temp]
+    #spell corrector
+    temp = [spell(w) for w in temp]
+    #stem
+    temp = [lemm.lemmatize(w) for w in temp]
+    #Removing short words
+    temp = [w for w in temp if len(w)>2]
+
+    temp = " ".join(w for w in temp)
+    return temp
 
 # Function to remove URLs using regex
 def remove_urls(text):
@@ -31,9 +78,10 @@ def remove_emojis(text):
                                "]+", flags=re.UNICODE)
     return emoji_pattern.sub('', text)
 
-def clean_data(url):
-    df = pd.read_csv(url)
-    df['clean_body'] = df['newscontents'].apply(remove_urls).apply(remove_emojis)
-    
-    result_df = df[['newssource', 'clean_body']]
+def clean_data(url, rows):
+    df = pd.read_csv(url, nrows=rows)
+    df['clean_body'] = df['body'].apply(remove_urls).apply(remove_emojis).apply(text_preprocess)
+    print("finished cleaning")
+    result_df = df[['tweet_id', 'post_date', 'clean_body']]
+    # result_df.to_csv("../data/cleaned_data.csv", index=False)
     return result_df
