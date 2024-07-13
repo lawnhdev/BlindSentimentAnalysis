@@ -37,7 +37,7 @@ def text_preprocess(doc):
     temp = temp[:669]  # Truncate if longer
     if len(temp) < 669:
         temp += [''] * (669 - len(temp))  # Pad if shorter
-        
+    
     #Fixing Word Lengthening
     temp = [reduce_lengthening(w) for w in temp]
     #spell corrector
@@ -79,7 +79,7 @@ def remove_emojis(text):
                                "]+", flags=re.UNICODE)
     return emoji_pattern.sub('', text)
 
-def clean_post_data(url, rows):
+def clean_data(url, rows, comments=False):
     df = pd.read_csv(url, nrows=rows)
     # remove the rows with referral in the text
     df = df[~df['Text'].str.contains('referral', case=False, na=False)]
@@ -87,11 +87,23 @@ def clean_post_data(url, rows):
     # apply the regex filter
     df['clean_body'] = df['Text'].apply(remove_urls).apply(remove_emojis).apply(text_preprocess)
 
+    # remove rows with empty body
+    df_cleaned = df[df['clean_body'].str.strip().astype(bool)]
     print("finished cleaning")
+    
+    if comments:
+        #TODO uncomment  when I have new dataset with Company data 
+        #result_df = df[['Post_ID', 'Date_Published', 'Company', 'Comment_ID', 'clean_body']] 
 
-    #colummns to keep from the post table
-    result_df = df[['Post_ID', 'Date_Published', 'Company', 'clean_body']] 
-    # save the cleaned data to a csv file just to visualize
-    #TODO remove in final version
-    result_df.to_csv("../data/cleaned_data.csv", index=False)
+        result_df = df_cleaned[['Post_ID', 'Date_Published', 'Comment_ID', 'clean_body']] 
+        # save the cleaned data to a csv file just for visualization 
+        # this will be removed in the final implementation
+        result_df.to_csv("../data/cleaned_comment_data.csv", index=False)
+    else:
+        result_df = df_cleaned[['Post_ID', 'Date_Published', 'Company', 'clean_body']] 
+        # save the cleaned data to a csv file just for visualization 
+        # this will be removed in the final implementation
+        result_df.to_csv("../data/cleaned_post_data.csv", index=False)
+    
     return result_df
+
