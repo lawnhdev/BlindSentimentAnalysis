@@ -191,7 +191,6 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c, options):
                 # Get like and view count before doing more
                 like_count_str = soup.find("button", attrs={ "aria-label": "Like this post"})["data-count"]
                 view_count_str = soup.find("button", attrs={ "aria-label": "Views" })["data-count"]
-                print(like_count_str)
                 insert_blind_post_to_db(json_data, view_count_str, like_count_str, company, conn, c)
                 # print('inserted ' + company + 'in thread ' + str(threading.get_native_id()))
         except json.JSONDecodeError as e:
