@@ -17,10 +17,10 @@ locale.setlocale( locale.LC_ALL, 'en_US.UTF-8' )
 
 def set_up_blind_post_database():
     # Connect to SQLite database
-    conn = sqlite3.connect('blind_posts.db', timeout=10000)
+    conn = sqlite3.connect('../blind_posts.db')
     c = conn.cursor()
     
-    # Create Post table
+    # Create Post tables
     c.execute('''CREATE TABLE IF NOT EXISTS Post (
                     Post_ID TEXT, 
                     Headline TEXT,
