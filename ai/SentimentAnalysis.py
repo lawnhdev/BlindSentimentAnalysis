@@ -30,9 +30,12 @@ def analyze_text(text):
     return scores
 
 def calculate_weight(likes, views):
+    # TODO: Fix -1 placeholder values for Q&A Posts.
     if views == 0:
         return 0
-    if likes == 0:
+    if views == -1:
+        views = 1
+    if likes == 0 or likes == -1:
         likes = 1
     return likes / views
 
