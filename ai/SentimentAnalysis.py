@@ -29,6 +29,13 @@ def analyze_text(text):
     scores = softmax(scores)
     return scores
 
+def calculate_weight(likes, views):
+    if views == 0:
+        return 0
+    if likes == 0:
+        likes = 1
+    return likes / views
+
 def analyze_dataset(path, rows=1000):
     cleaned_data = clean_data(path, rows)
     data_list = []
@@ -36,12 +43,15 @@ def analyze_dataset(path, rows=1000):
     for idx, data in cleaned_data.iterrows():
         scores = analyze_text(data["clean_body"])
         ranking = np.argsort(scores)[::-1]
+        weight = calculate_weight(data["Like_Count"], data["View_Count"])
         data_list.append({
+            "view_count": data["View_Count"],
+            "like_count": data["Like_Count"],
             "company": data["Company"],
             "body": data["clean_body"], 
-            "neutral": scores[ranking[0]],
-            "positive": scores[ranking[1]],
-            "negative": scores[ranking[2]]
+            "neutral": scores[ranking[0]]*weight,
+            "positive": scores[ranking[1]]*weight,
+            "negative": scores[ranking[2]]*weight
         })
 
     df = pd.DataFrame(data_list)

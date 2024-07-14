@@ -84,12 +84,11 @@ def clean_data(url, rows, comments=False):
     print("Finished cleaning")
     
     if comments:
-        # Uncomment the line below when you have a dataset with Company data
         result_df = df[['Post_ID', 'Date_Published', 'Company', 'Comment_ID', 'clean_body']]
         # For now, save the cleaned comment data to a CSV file for visualization
         result_df.to_csv("../data/cleaned_comment_data.csv", index=False)
     else:
-        result_df = df_cleaned[['Post_ID', 'Date_Published', 'Company', 'clean_body']]
+        result_df = df_cleaned[['Post_ID', 'Date_Published', 'Company', 'clean_body', 'Like_Count', 'View_Count' ]]
         # Save the cleaned post data to a CSV file for visualization
         result_df.to_csv("../data/cleaned_post_data.csv", index=False)
     
