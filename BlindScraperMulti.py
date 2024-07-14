@@ -36,6 +36,8 @@ def set_up_blind_post_database():
                     URL TEXT,
                     Author TEXT,
                     Comment_Count INTEGER,
+                    View_Count INTEGER,
+                    Like_Count INTEGER,
                     FOREIGN KEY (Company) REFERENCES Company(Name)
                 )''')
 
@@ -78,7 +80,7 @@ def set_up_blind_post_database():
     # Return connection and cursor
     return conn, c
 
-def insert_blind_post_to_db(json_data, company, conn, c):
+def insert_blind_post_to_db(json_data, view_count_str, like_count_str, company, conn, c):
     # Extract post information
     post_info = (
         json_data.get('headline', ''),
@@ -87,12 +89,14 @@ def insert_blind_post_to_db(json_data, company, conn, c):
         json_data.get('datePublished', ''),
         json_data.get('url', ''),
         json_data.get('author', {}).get('name', ''),
-        json_data.get('commentCount', '')
+        json_data.get('commentCount', ''),
+        locale.atoi(view_count_str),
+        locale.atoi(like_count_str)
     )
 
     # Insert post information into Post table
-    c.execute('''INSERT INTO Post (Headline, Company, Text, Date_Published, URL, Author, Comment_Count)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)''', post_info)
+    c.execute('''INSERT INTO Post (Headline, Company, Text, Date_Published, URL, Author, Comment_Count, View_Count, Like_Count)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', post_info)
 
     # Get the current post ID
     post_id = c.lastrowid
@@ -184,7 +188,10 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c, options):
             json_data = json.loads(script.string) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
             #print(json_data)
             if json_data.get('@type') == 'DiscussionForumPosting':
-                insert_blind_post_to_db(json_data, company, conn, c)
+                # Get like and view count before doing more
+                like_count_str = soup.find("button", attrs={ "aria-label": "Like this post"})["data-count"]
+                view_count_str = soup.find("button", attrs={ "aria-label": "Views" })["data-count"]
+                insert_blind_post_to_db(json_data, view_count_str, like_count_str, company, conn, c)
                 # print('inserted ' + company + 'in thread ' + str(threading.get_native_id()))
         except json.JSONDecodeError as e:
             continue  # Every single one will fail except the post we are looking for
