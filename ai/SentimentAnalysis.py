@@ -32,7 +32,7 @@ def analyze_text(text):
 def analyze_dataset(path, rows=1000):
     cleaned_data = clean_data(path, rows)
     data_list = []
-
+    #iterate through the cleaned posts and calculate sentiment scores for each
     for idx, data in cleaned_data.iterrows():
         scores = analyze_text(data["clean_body"])
         ranking = np.argsort(scores)[::-1]
@@ -52,6 +52,7 @@ def analyze_post_comments(post_id, comment_data):
     filtered_comments = comment_data.loc[comment_data['Post_ID'] == post_id]
     comment_scores = []
 
+    #iterate through the comments and calculate sentiment scores for each
     for idx, data in filtered_comments.iterrows():
         scores = analyze_text(data["clean_body"])
         ranking = np.argsort(scores)[::-1]
@@ -71,6 +72,7 @@ def analyze_dataset_with_comments(post_path, comments_path, weighted, rows=1000)
     cleaned_comments_data = clean_data(comments_path, rows, True)
     data_list = []
 
+    #iterate through the cleaned posts and calculate sentiment scores for each
     for idx, data in cleaned_post_data.iterrows():
         comment_scores = analyze_post_comments(data["Post_ID"], cleaned_comments_data)
         post_scores = analyze_text(data["clean_body"])
@@ -99,7 +101,7 @@ def analyze_dataset_with_comments(post_path, comments_path, weighted, rows=1000)
     return df
 
 if __name__ == "__main__":
-    # uncomment this when done @luis
+    # uncomment this to manually load datasets
     # parser = argparse.ArgumentParser("Generate sentiment for a company")
     # parser.add_argument("company", nargs='?', help="Company to generate for all history", type=str)
     # args = parser.parse_args()
@@ -108,7 +110,7 @@ if __name__ == "__main__":
     # else:
     #     ImportCSV.write_to_csv_single(args.company, post_dataset_path, comments_dataset_path)
 
-    # ////remove the following
+    # ////remove the following if manually loading datasets
     parser = argparse.ArgumentParser("Generate sentiment for a company")
     parser.add_argument("overwrite", nargs='?', help="if false then uses files u put in", type=int)
 
@@ -117,8 +119,6 @@ if __name__ == "__main__":
         print("skipping db read")
     else:
         ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
-    
-    
     # to here///////
         
     # dataset with just posts
