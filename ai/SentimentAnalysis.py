@@ -111,16 +111,6 @@ def analyze_dataset_with_comments(post_path, comments_path, weighted, rows=1000)
     return df
 
 if __name__ == "__main__":
-    # uncomment this to manually load datasets
-    # parser = argparse.ArgumentParser("Generate sentiment for a company")
-    # parser.add_argument("company", nargs='?', help="Company to generate for all history", type=str)
-    # args = parser.parse_args()
-    # if args.company is None:
-    #     ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
-    # else:
-    #     ImportCSV.write_to_csv_single(args.company, post_dataset_path, comments_dataset_path)
-
-    # ////remove the following if manually loading datasets
     parser = argparse.ArgumentParser("Generate sentiment for a company")
     parser.add_argument("overwrite", nargs='?', help="if false then uses files u put in", type=int)
 
@@ -129,7 +119,6 @@ if __name__ == "__main__":
         print("skipping db read")
     else:
         ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
-    # to here///////
         
     # dataset with just posts
     post_df = analyze_dataset(post_dataset_path)
@@ -137,8 +126,6 @@ if __name__ == "__main__":
     weighted_df = analyze_dataset_with_comments(post_dataset_path, comments_dataset_path, True)
     # dataset with posts + comments unweighted
     unweighted_df = analyze_dataset_with_comments(post_dataset_path, comments_dataset_path, False)
-
-    # TODO: use a weighted average for posts when we have likes and views
 
     # group by company and get the average sentiment scores with just posts 
     comp_avg_no_comments_df = post_df.groupby('company')[['neutral', 'positive', 'negative']].mean().reset_index()
