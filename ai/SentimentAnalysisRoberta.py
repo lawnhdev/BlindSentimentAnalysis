@@ -99,14 +99,28 @@ def analyze_dataset_with_comments(post_path, comments_path, weighted, rows=1000)
     return df
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Generate sentiment for a company")
-    parser.add_argument("company", nargs='?', help="Company to generate for all history", type=str)
-    args = parser.parse_args()
-    if args.company is None:
-        ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
-    else:
-        ImportCSV.write_to_csv_single(args.company, post_dataset_path, comments_dataset_path)
+    # uncomment this when done @luis
+    # parser = argparse.ArgumentParser("Generate sentiment for a company")
+    # parser.add_argument("company", nargs='?', help="Company to generate for all history", type=str)
+    # args = parser.parse_args()
+    # if args.company is None:
+    #     ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
+    # else:
+    #     ImportCSV.write_to_csv_single(args.company, post_dataset_path, comments_dataset_path)
 
+    # ////remove the following
+    parser = argparse.ArgumentParser("Generate sentiment for a company")
+    parser.add_argument("overwrite", nargs='?', help="if false then uses files u put in", type=int)
+
+    args = parser.parse_args()
+    if args.overwrite:
+        print("skipping db read")
+    else:
+        ImportCSVAll.write_to_csv(post_dataset_path, comments_dataset_path)
+    
+    
+    # to here///////
+        
     # dataset with just posts
     post_df = analyze_dataset(post_dataset_path)
     # dataset with posts + comments weighted equally
