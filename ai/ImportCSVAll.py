@@ -2,7 +2,7 @@ import csv
 import sqlite3
 
 def write_to_csv(dataset_path, comments_dataset_path):
-
+    
     conn = sqlite3.connect('../blind_posts.db')
     cursor = conn.cursor()
     cursor.execute(f'SELECT * FROM Post')
