@@ -15,7 +15,6 @@ def write_to_csv(dataset_path, comments_dataset_path):
     cursor.execute(f'SELECT * FROM Comment')
     with open(comments_dataset_path, 'w', newline='') as c_file:
         c_writer = csv.writer(c_file)
-        print(cursor.description)
         c_writer.writerow([d[0] for d in cursor.description])
         for result in cursor:
             c_writer.writerow(result)
