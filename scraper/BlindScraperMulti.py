@@ -74,7 +74,7 @@ def set_up_blind_post_database():
     # Return connection and cursor
     return conn, c
 
-def insert_qa_post_to_db(json_data, company, conn, c):
+def insert_qa_post_to_db(json_data, view_count_str, company, conn, c):
     # Extract post information
     '''
 
@@ -157,7 +157,7 @@ def insert_qa_post_to_db(json_data, company, conn, c):
     # Split the URL by '/post/' and take the last part to get the post_id
     post_id = post_url.split('/post/')[-1]
     accepted_answer_author_name = json_data['mainEntity'].get('acceptedAnswer', '').get('author', '').get('name', '')
-
+    # print(f"Q&A Post Views: {view_count_str} and Upvotes: {upvote_count}")
     post_info = (
         post_id,
         question,
@@ -166,8 +166,8 @@ def insert_qa_post_to_db(json_data, company, conn, c):
         date_created,
         author_name,
         answer_count,
-        -1, # placeholder values until we do likes/views for q&a posts
-        -1,
+        upvote_count,
+        locale.atoi(view_count_str),
     )
     print(post_info)
 
@@ -213,11 +213,14 @@ def insert_qa_post_to_db(json_data, company, conn, c):
     # Commit changes to the database
     conn.commit()
 
-def insert_discussion_forum_post_to_db(json_data, view_count_str, like_count_str, company, conn, c):
+def insert_discussion_forum_post_to_db(json_data, view_count_str, company, conn, c):
     post_url = json_data.get('url', '')
     # Split the URL by '/post/' and take the last part to get the post_id
     post_id = post_url.split('/post/')[-1]
-    # Extract post information
+    # changing to get the post upvote count like this because strangely occasionally
+    # the html has no button with the aria-label="Like this post"
+    upvote_count = json_data.get('interactionStatistic').get('userInteractionCount') # holds the # of upvotes on the post
+    # print(f"Discussion Forum Post Views: {view_count_str} and Upvotes: {upvote_count}")
     post_info = (
         post_id,
         json_data.get('headline', ''),
@@ -227,7 +230,7 @@ def insert_discussion_forum_post_to_db(json_data, view_count_str, like_count_str
         json_data.get('author', {}).get('name', ''),
         json_data.get('commentCount', ''),
         locale.atoi(view_count_str),
-        locale.atoi(like_count_str)
+        upvote_count
     )
     print(post_info)
 
@@ -298,8 +301,6 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c, options, windo
         # driver.get(post_url)
         # page_source = driver.page_source
         driver.quit()
-        driver = None
-        time.sleep(10)
         driver = webdriver.Chrome(options=options)
         # print(str(threading.get_native_id()) + " " + str(driver) + 'new driver')
         driver.get(post_url)
@@ -324,16 +325,17 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c, options, windo
                         json_data = json.loads(json.loads(stripped_data)) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
                         if isinstance(json_data, dict):
                             if json_data.get('@type') == 'DiscussionForumPosting':
-                                # Get like and view count before doing more
-                                like_count_str = soup.find("button", attrs={ "aria-label": "Like this post"})["data-count"]
-                                view_count_str = soup.find("button", attrs={ "aria-label": "Views" })["data-count"]
-                                insert_discussion_forum_post_to_db(json_data, view_count_str, like_count_str, company, conn, c)
+                                view_count_str = soup.find('button', {'aria-label': 'Views'})['data-count']
+                                insert_discussion_forum_post_to_db(json_data, view_count_str, company, conn, c)
                                 print('inserted dicussion forum post for ' + company + ' in thread ' + str(threading.get_native_id()))
+
                             if json_data.get('@type') == 'QAPage':
-                                insert_qa_post_to_db(json_data, company, conn, c)
+                                view_count_str = soup.find('button', {'aria-label': 'Views'})['data-count']
+                                insert_qa_post_to_db(json_data, view_count_str, company, conn, c)
                                 print('inserted Q&A forum post for' + company + 'in thread ' + str(threading.get_native_id()))
                     except json.JSONDecodeError as e:
                         continue  # Every single one will fail except the post we are looking for
+
     else: # for the other dawgs
         # Find all <script> elements
         script_elements = soup.find_all('script', {'type': 'application/ld+json'})
@@ -346,14 +348,13 @@ def parse_blind_post_from_url(driver, post_url, company, conn, c, options, windo
                 json_data = json.loads(script.string) # https://stackoverflow.com/questions/25613565/python-json-loads-returning-string-instead-of-dictionary
                 #print(json_data)
                 if json_data.get('@type') == 'DiscussionForumPosting':
-                    # Get like and view count before doing more
-                    like_count_str = soup.find("button", attrs={ "aria-label": "Like this post"})["data-count"]
                     view_count_str = soup.find("button", attrs={ "aria-label": "Views" })["data-count"]
-                    insert_discussion_forum_post_to_db(json_data, view_count_str, like_count_str, company, conn, c)
+                    insert_discussion_forum_post_to_db(json_data, view_count_str, company, conn, c)
                     print('inserted dicussion forum post for' + company + 'in thread ' + str(threading.get_native_id()))
                     # print('inserted ' + company + 'in thread ' + str(threading.get_native_id()))
                 if json_data.get('@type') == 'QAPage':
-                    insert_qa_post_to_db(json_data, company, conn, c)
+                    view_count_str = soup.find("button", attrs={ "aria-label": "Views" })["data-count"]
+                    insert_qa_post_to_db(json_data, view_count_str, company, conn, c)
                     print('inserted Q&A forum post for' + company + 'in thread ' + str(threading.get_native_id()))
             except json.JSONDecodeError as e:
                 continue  # Every single one will fail except the post we are looking for
